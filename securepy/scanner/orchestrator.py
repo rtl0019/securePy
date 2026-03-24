@@ -63,7 +63,10 @@ class SecurePyOrchestrator:
 
     def run(self) -> ScanResult:
         files = discover_python_files(self.config.root, self.config.include_ext, self.config.exclude_dirs)
-        index = ProjectIndex(root=self.config.root.resolve())
+        root_path = self.config.root.resolve()
+        if root_path.is_file():
+            root_path = root_path.parent
+        index = ProjectIndex(root=root_path)
         parse_errors: list[dict] = []
         parsed_files = 0
 
