@@ -9,7 +9,7 @@ description = "A powerful static security analyzer for Python code"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
-authors = [{name = "SecurePy Contributors"}]
+authors = [{name = "Ayush Patel and Ryan Lunsford"}]
 keywords = ["security", "static-analysis", "vulnerability-detection"]
 
 [project.urls]
