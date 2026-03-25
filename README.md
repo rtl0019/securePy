@@ -73,8 +73,3 @@ pytest
 ## License
 
 MIT License
-
-## Support
-
-- 🐛 [Report Issues](https://github.com/rtl0019/securePy/issues)
-- 💬 [Discussions](https://github.com/rtl0019/securePy/discussions)
