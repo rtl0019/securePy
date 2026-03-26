@@ -29,6 +29,129 @@ type SecurePyJson = {
 let outputChannel: vscode.OutputChannel;
 let diagnosticCollection: vscode.DiagnosticCollection;
 
+class SecurePyQuickFixProvider implements vscode.CodeActionProvider {
+  provideCodeActions(
+    document: vscode.TextDocument,
+    _range: vscode.Range,
+    context: vscode.CodeActionContext
+  ): vscode.CodeAction[] {
+    const actions: vscode.CodeAction[] = [];
+
+    for (const diagnostic of context.diagnostics) {
+      if (diagnostic.source !== "SecurePy") {
+        continue;
+      }
+
+      const code = getDiagnosticCode(diagnostic);
+
+      switch (code) {
+        case "debug_mode":
+        case "flask_debug_true":
+          actions.push(createDebugFalseFix(document, diagnostic));
+          break;
+
+        case "unsafe_yaml_load":
+        case "yaml_load":
+          actions.push(createYamlSafeLoadFix(document, diagnostic));
+          break;
+
+        default:
+          actions.push(createShowRuleHelpAction(code, diagnostic));
+          break;
+      }
+    }
+
+    return actions;
+  }
+}
+
+function getDiagnosticCode(diagnostic: vscode.Diagnostic): string {
+  if (typeof diagnostic.code === "string") {
+    return diagnostic.code;
+  }
+
+  if (
+    diagnostic.code &&
+    typeof diagnostic.code === "object" &&
+    "value" in diagnostic.code
+  ) {
+    return String(diagnostic.code.value);
+  }
+
+  return "securepy";
+}
+
+function createDebugFalseFix(
+  document: vscode.TextDocument,
+  diagnostic: vscode.Diagnostic
+): vscode.CodeAction {
+  const action = new vscode.CodeAction(
+    "Change debug=True to debug=False",
+    vscode.CodeActionKind.QuickFix
+  );
+
+  action.diagnostics = [diagnostic];
+  action.isPreferred = true;
+
+  const line = document.lineAt(diagnostic.range.start.line);
+  if (!line.text.includes("debug=True")) {
+    return action;
+  }
+
+  const newLine = line.text.replace("debug=True", "debug=False");
+
+  const edit = new vscode.WorkspaceEdit();
+  edit.replace(document.uri, line.range, newLine);
+  action.edit = edit;
+
+  return action;
+}
+
+function createYamlSafeLoadFix(
+  document: vscode.TextDocument,
+  diagnostic: vscode.Diagnostic
+): vscode.CodeAction {
+  const action = new vscode.CodeAction(
+    "Replace yaml.load with yaml.safe_load",
+    vscode.CodeActionKind.QuickFix
+  );
+
+  action.diagnostics = [diagnostic];
+  action.isPreferred = true;
+
+  const line = document.lineAt(diagnostic.range.start.line);
+  if (!line.text.includes("yaml.load")) {
+    return action;
+  }
+
+  const newLine = line.text.replace("yaml.load", "yaml.safe_load");
+
+  const edit = new vscode.WorkspaceEdit();
+  edit.replace(document.uri, line.range, newLine);
+  action.edit = edit;
+
+  return action;
+}
+
+function createShowRuleHelpAction(
+  code: string,
+  diagnostic: vscode.Diagnostic
+): vscode.CodeAction {
+  const action = new vscode.CodeAction(
+    `SecurePy: Explain rule "${code}"`,
+    vscode.CodeActionKind.QuickFix
+  );
+
+  action.diagnostics = [diagnostic];
+  action.command = {
+    command: "securepy.explainRule",
+    title: "Explain SecurePy rule",
+    arguments: [code]
+  };
+
+  return action;
+}
+
 export function activate(context: vscode.ExtensionContext) {
   outputChannel = vscode.window.createOutputChannel("SecurePy");
   diagnosticCollection = vscode.languages.createDiagnosticCollection("securepy");
@@ -73,6 +196,20 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.showInformationMessage("SecurePy diagnostics cleared.");
   });
 
+  const explainRuleCommand = vscode.commands.registerCommand("securepy.explainRule", async (code: string) => {
+    vscode.window.showInformationMessage(
+      `SecurePy rule: ${code}. Add richer rule documentation or a docs URL here later.`
+    );
+  });
+
+  const quickFixProvider = vscode.languages.registerCodeActionsProvider(
+    { language: "python", scheme: "file" },
+    new SecurePyQuickFixProvider(),
+    {
+      providedCodeActionKinds: [vscode.CodeActionKind.QuickFix]
+    }
+  );
+
   const scanOnSaveDisposable = vscode.workspace.onDidSaveTextDocument(async (document) => {
     const config = vscode.workspace.getConfiguration();
     const scanOnSave = config.get<boolean>("securepy.scanOnSave", false);
@@ -97,6 +234,8 @@ export function activate(context: vscode.ExtensionContext) {
     scanFileCommand,
     scanWorkspaceCommand,
     clearDiagnosticsCommand,
+    explainRuleCommand,
+    quickFixProvider,
     scanOnSaveDisposable,
     outputChannel,
     diagnosticCollection
@@ -111,7 +250,7 @@ async function runSecurePyScan(
   showOutput: boolean = true
 ): Promise<void> {
   const config = vscode.workspace.getConfiguration();
-  const executablePath = config.get<string>("securepy.executablePath", "securepy");
+  const configuredExecutablePath = (config.get<string>("securepy.executablePath", "") ?? "").trim();
   const extraArgs = config.get<string[]>("securepy.scanArgs", [
     "--format",
     "json",
@@ -119,7 +258,31 @@ async function runSecurePyScan(
     "--no-color"
   ]);
 
-  const args = ["scan", ...targets, ...extraArgs];
+  const directArgs = ["scan", ...targets, ...extraArgs];
+  const pythonModuleArgs = ["-m", "securepy", "scan", ...targets, ...extraArgs];
+
+  const commandsToTry: Array<{ command: string; args: string[]; label: string }> = [];
+
+  if (configuredExecutablePath.length > 0) {
+    commandsToTry.push({
+      command: configuredExecutablePath,
+      args: directArgs,
+      label: configuredExecutablePath
+    });
+  }
+
+  commandsToTry.push(
+    {
+      command: "python3",
+      args: pythonModuleArgs,
+      label: "python3 -m securepy"
+    },
+    {
+      command: "python",
+      args: pythonModuleArgs,
+      label: "python -m securepy"
+    }
+  );
 
   outputChannel.clear();
 
@@ -127,22 +290,39 @@ async function runSecurePyScan(
     outputChannel.show(true);
   }
 
-  outputChannel.appendLine(`Running: ${executablePath} ${args.join(" ")}`);
-  outputChannel.appendLine("");
+  let lastError: Error | null = null;
+  let combinedStderr = "";
 
-  execFile(executablePath, args, { cwd }, async (error, stdout, stderr) => {
-    if (stderr) {
+  for (const attempt of commandsToTry) {
+    outputChannel.appendLine(`Running: ${attempt.label} ${attempt.args.join(" ")}`);
+    outputChannel.appendLine("");
+
+    const result = await execFileAsync(attempt.command, attempt.args, cwd);
+
+    if (result.stderr?.trim()) {
       outputChannel.appendLine("stderr:");
-      outputChannel.appendLine(stderr);
+      outputChannel.appendLine(result.stderr);
       outputChannel.appendLine("");
+      combinedStderr += `${attempt.label} stderr:\n${result.stderr}\n`;
     }
 
-    if (error) {
-      vscode.window.showErrorMessage(`SecurePy failed: ${error.message}`);
+    if (result.error) {
+      lastError = result.error;
+
+      outputChannel.appendLine(`Attempt failed: ${result.error.message}`);
+      outputChannel.appendLine("");
+
+      if (isCommandNotFoundError(result.error)) {
+        continue;
+      }
+
+      vscode.window.showErrorMessage(`SecurePy failed: ${result.error.message}`);
       return;
     }
 
-    if (!stdout || !stdout.trim()) {
+    const stdout = result.stdout ?? "";
+
+    if (!stdout.trim()) {
       diagnosticCollection.clear();
       outputChannel.appendLine("No JSON output received from SecurePy.");
       vscode.window.showWarningMessage("SecurePy completed, but returned no JSON output.");
@@ -159,12 +339,45 @@ async function runSecurePyScan(
       if (showOutput) {
         vscode.window.showInformationMessage("SecurePy scan complete.");
       }
+      return;
     } catch (parseError) {
       outputChannel.appendLine("Failed to parse SecurePy JSON output.");
       outputChannel.appendLine(String(parseError));
       vscode.window.showWarningMessage("SecurePy completed, but JSON parsing failed.");
+      return;
     }
+  }
+
+  const installMessage =
+    "SecurePy could not be launched. Install it with 'pip install securepy' or set 'securepy.executablePath' in VS Code settings.";
+
+  if (combinedStderr.trim()) {
+    outputChannel.appendLine("All launch attempts failed.");
+    outputChannel.appendLine(combinedStderr);
+  }
+
+  vscode.window.showErrorMessage(installMessage);
+}
+
+function execFileAsync(
+  command: string,
+  args: string[],
+  cwd?: string
+): Promise<{ stdout: string; stderr: string; error: Error | null }> {
+  return new Promise((resolve) => {
+    execFile(command, args, { cwd }, (error, stdout, stderr) => {
+      resolve({
+        stdout: stdout ?? "",
+        stderr: stderr ?? "",
+        error: error ?? null
+      });
+    });
   });
+}
+
+function isCommandNotFoundError(error: Error): boolean {
+  const maybeNodeError = error as NodeJS.ErrnoException;
+  return maybeNodeError.code === "ENOENT";
 }
 
 async function applyDiagnostics(data: SecurePyJson): Promise<void> {
@@ -245,7 +458,10 @@ async function buildDiagnosticRange(
     }
 
     const safeCol = Math.min(col, Math.max(lineText.length, 0));
-    const endCol = Math.min(safeCol + 1, Math.max(lineText.length, 1));
+
+    const tokenMatch = lineText.slice(safeCol).match(/^[A-Za-z_][A-Za-z0-9_.=()'", ]*/);
+    const tokenLength = tokenMatch ? tokenMatch[0].length : 1;
+    const endCol = Math.min(safeCol + Math.max(tokenLength, 1), Math.max(lineText.length, 1));
 
     return new vscode.Range(
       new vscode.Position(safeLine, safeCol),
