@@ -2,6 +2,22 @@
 
 A powerful, extensible static security analyzer for Python code. Detect security vulnerabilities, hardcoded secrets, and insecure patterns with configurable rules and minimal false positives.
 
+## Requirements
+
+SecurePy must be installed in your Python environment.
+
+Recommended:
+
+pip install securepy
+
+Optional:
+- Set `securepy.executablePath` to a specific SecurePy executable path.
+
+If `securepy.executablePath` is empty, the extension will try:
+- `python3 -m securepy`
+- `python -m securepy`
+
+
 ## Features
 
 🔍 **10 Security Rules** - Comprehensive coverage of common vulnerabilities:
