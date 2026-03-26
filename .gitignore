@@ -50,3 +50,11 @@ htmlcov/
 report.json
 *.log
 .securepy_cache/
+
+# VS Code extension artifacts
+vscode-extension/securepy/node_modules/
+vscode-extension/securepy/out/
+vscode-extension/securepy/*.vsix
+
+# Virtual environment
+.venv/
