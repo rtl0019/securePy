@@ -3,7 +3,7 @@
   "publisher": "securepy",
   "displayName": "SecurePy",
   "description": "Run the SecurePy Python security scanner in VS Code with diagnostics, workspace scanning, and scan-on-save support. ",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "engines": {
     "vscode": "^1.110.0"
   },
@@ -30,6 +30,10 @@
       {
         "command": "securepy.clearDiagnostics",
         "title": "SecurePy: Clear Diagnostics"
+      },
+      {
+        "command": "securepy.explainRule",
+        "title": "SecurePy: Explain Rule"
       }
     ],
     "configuration": {
@@ -37,17 +41,22 @@
       "properties": {
         "securepy.executablePath": {
           "type": "string",
-          "default": "/Users/kylerswindle/Downloads/securepy/securePy/.venv/bin/securepy",
-          "description": "Path to the SecurePy executable."
+          "default": "",
+          "description": "Optional path to the SecurePy executable. If empty, the extension will try 'python3 -m securepy' and then 'python -m securepy'."
         },
         "securepy.scanArgs": {
           "type": "array",
-          "default": ["--format", "json", "--stdout", "--no-color"],
+          "default": [
+            "--format",
+            "json",
+            "--stdout",
+            "--no-color"
+          ],
           "items": {
             "type": "string"
           },
           "description": "Extra arguments passed to SecurePy."
-        }, 
+        },
         "securepy.scanOnSave": {
           "type": "boolean",
           "default": false,
@@ -65,13 +74,13 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.110.0",
     "@types/mocha": "^10.0.10",
-    "@types/node": "22.x",
-    "typescript-eslint": "^8.56.1",
+    "@types/node": "^22.19.15",
+    "@types/vscode": "^1.110.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
     "eslint": "^9.39.3",
     "typescript": "^5.9.3",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2"
+    "typescript-eslint": "^8.56.1"
   }
 }
