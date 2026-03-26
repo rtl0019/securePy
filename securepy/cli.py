@@ -56,6 +56,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional rule IDs to enable",
     )
     scan.add_argument("--no-color", action="store_true", help="Disable color in console output")
+    scan.add_argument(
+    "--stdout",
+    action="store_true",
+    help="Print JSON output to stdout instead of writing a file",
+)
 
     return parser
 
@@ -84,8 +89,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         ConsoleReporter(no_color=args.no_color).render(result)
 
     if args.format in {"json", "both"}:
-        output_path = Path(args.out) if args.out else Path("securepy-report.json")
-        JsonReporter().write(result, output_path)
+        reporter = JsonReporter()
+
+        if args.stdout:
+            print(reporter.to_json(result))
+        else:
+            output_path = Path(args.out) if args.out else Path("securepy-report.json")
+            reporter.write(result, output_path)
 
     return 0
 
