@@ -1,0 +1,77 @@
+{
+  "name": "securepy",
+  "publisher": "securepy",
+  "displayName": "SecurePy",
+  "description": "Run the SecurePy Python security scanner in VS Code with diagnostics, workspace scanning, and scan-on-save support. ",
+  "version": "0.0.2",
+  "engines": {
+    "vscode": "^1.110.0"
+  },
+  "categories": [
+    "Linters",
+    "Other"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rtl0019/securePy"
+  },
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "securepy.scanFile",
+        "title": "SecurePy: Scan Current File"
+      },
+      {
+        "command": "securepy.scanWorkspace",
+        "title": "SecurePy: Scan Workspace"
+      },
+      {
+        "command": "securepy.clearDiagnostics",
+        "title": "SecurePy: Clear Diagnostics"
+      }
+    ],
+    "configuration": {
+      "title": "SecurePy",
+      "properties": {
+        "securepy.executablePath": {
+          "type": "string",
+          "default": "/Users/kylerswindle/Downloads/securepy/securePy/.venv/bin/securepy",
+          "description": "Path to the SecurePy executable."
+        },
+        "securepy.scanArgs": {
+          "type": "array",
+          "default": ["--format", "json", "--stdout", "--no-color"],
+          "items": {
+            "type": "string"
+          },
+          "description": "Extra arguments passed to SecurePy."
+        }, 
+        "securepy.scanOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically scan Python files with SecurePy whenever they are saved."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.110.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.56.1",
+    "eslint": "^9.39.3",
+    "typescript": "^5.9.3",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}
